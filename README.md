@@ -109,7 +109,7 @@ Add the MCP server to Claude Code settings (`~/.claude/settings.json` or project
   "mcpServers": {
     "mat": {
       "command": "node",
-      "args": ["/Users/lipenghui/Github/mcp-mat/dist/src/server.js"],
+      "args": ["/path/to/mcp-mat/dist/src/server.js"],
       "env": {
         "MAT_ALLOWED_ROOTS": "/ABS/PATH/TO/HEAP_DUMPS",
         "MAT_HOME": "/Applications/MemoryAnalyzer.app/Contents/Eclipse"
@@ -124,7 +124,7 @@ Add the MCP server to Claude Code settings (`~/.claude/settings.json` or project
 Build first:
 
 ```bash
-cd /Users/lipenghui/Github/mcp-mat
+cd /path/to/mcp-mat
 npm install
 npm run build
 ```
@@ -136,7 +136,7 @@ codex mcp add \
   --env MAT_ALLOWED_ROOTS=/ABS/PATH/TO/HEAP_DUMPS \
   --env MAT_HOME=/Applications/MemoryAnalyzer.app/Contents/Eclipse \
   mat \
-  node /Users/lipenghui/Github/mcp-mat/dist/src/server.js
+  node /path/to/mcp-mat/dist/src/server.js
 ```
 
 Verify:
@@ -158,7 +158,7 @@ Equivalent `~/.codex/config.toml` entry:
 ```toml
 [mcp_servers.mat]
 command = "node"
-args = ["/Users/lipenghui/Github/mcp-mat/dist/src/server.js"]
+args = ["/path/to/mcp-mat/dist/src/server.js"]
 
 [mcp_servers.mat.env]
 MAT_ALLOWED_ROOTS = "/ABS/PATH/TO/HEAP_DUMPS"
