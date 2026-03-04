@@ -6,6 +6,7 @@ import { runMatIndexStatus } from "./matIndexStatus.js";
 import { runMatOqlQuery } from "./matOqlQuery.js";
 import { runMatOqlSpec } from "./matOqlSpec.js";
 import { runMatParseReport } from "./matParseReport.js";
+import { runMatRunCommand } from "./matRunCommand.js";
 
 export async function executeTool(name: string, args: unknown, service: MatService): Promise<ToolResponse> {
   try {
@@ -22,6 +23,9 @@ export async function executeTool(name: string, args: unknown, service: MatServi
       case "mat_index_status": {
         return runMatIndexStatus(service, args);
       }
+      case "mat_run_command": {
+        return await runMatRunCommand(service, args);
+      }
       case "mat_oql_spec": {
         return runMatOqlSpec(service, args);
       }
@@ -29,7 +33,7 @@ export async function executeTool(name: string, args: unknown, service: MatServi
         return new MatMcpError({
           category: "MAT_PARSE_FAILED",
           message: `Unknown tool: ${name}`,
-          hint: "Use one of: mat_healthcheck, mat_parse_report, mat_oql_query, mat_index_status, mat_oql_spec.",
+          hint: "Use one of: mat_healthcheck, mat_parse_report, mat_oql_query, mat_run_command, mat_index_status, mat_oql_spec.",
         }).toResponse();
     }
   } catch (error) {

@@ -96,3 +96,35 @@ export function buildOqlCommand(
     timeoutSec: base.timeoutSec,
   };
 }
+
+export function buildGenericCommand(
+  base: BaseMatCommandArgs,
+  params: {
+    commandName: string;
+    commandArgs?: string;
+    format: "txt" | "html" | "csv";
+    unzip: boolean;
+    limit?: number;
+  },
+): RunCommand {
+  const args = buildCommonArgs(base);
+
+  const commandPart = params.commandArgs
+    ? `${params.commandName} ${params.commandArgs}`
+    : params.commandName;
+  args.push(`-command=${commandPart}`);
+  args.push(`-format=${params.format}`);
+  if (params.unzip) {
+    args.push("-unzip");
+  }
+  if (params.limit !== undefined) {
+    args.push(`-limit=${params.limit}`);
+  }
+  args.push("org.eclipse.mat.api:query");
+
+  return {
+    command: base.javaPath,
+    args,
+    timeoutSec: base.timeoutSec,
+  };
+}

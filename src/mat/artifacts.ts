@@ -74,15 +74,16 @@ function discoverGeneratedNearHeap(heapPath: string, startedAtMs?: number): stri
     .sort();
 }
 
-function findQueryCommandText(queryDir: string): string | null {
+function findQueryCommandText(queryDir: string, startedAtMs?: number): string | null {
   const pagesDir = path.join(queryDir, "pages");
   if (!fs.existsSync(pagesDir) || !fs.statSync(pagesDir).isDirectory()) {
     return null;
   }
 
   const candidates = safeReadDir(pagesDir)
-    .filter((entry) => entry.isFile() && /^Query_Command\d+\.txt$/.test(entry.name))
-    .map((entry) => path.join(pagesDir, entry.name));
+    .filter((entry) => entry.isFile() && /^Query_Command[_\d]*\d+\.txt$/.test(entry.name))
+    .map((entry) => path.join(pagesDir, entry.name))
+    .filter((fullPath) => isRecentEnough(fullPath, startedAtMs));
 
   return latestByMtime(candidates);
 }
@@ -93,6 +94,8 @@ export function resolveQueryArtifacts(heapPath: string, startedAtMs?: number): Q
 
   const queryDirCandidates: string[] = [];
   const queryZipCandidates: string[] = [];
+  // Directories whose own mtime is stale but may contain recently-updated files
+  const staleDirCandidates: string[] = [];
 
   for (const entry of safeReadDir(parent)) {
     const fullPath = path.join(parent, entry.name);
@@ -102,21 +105,34 @@ export function resolveQueryArtifacts(heapPath: string, startedAtMs?: number): Q
       continue;
     }
 
-    if (!isRecentEnough(fullPath, startedAtMs)) {
-      continue;
-    }
-
     if (entry.isDirectory()) {
-      queryDirCandidates.push(fullPath);
+      if (isRecentEnough(fullPath, startedAtMs)) {
+        queryDirCandidates.push(fullPath);
+      } else {
+        staleDirCandidates.push(fullPath);
+      }
     }
     if (entry.isFile() && entry.name.endsWith(".zip")) {
-      queryZipCandidates.push(fullPath);
+      if (isRecentEnough(fullPath, startedAtMs)) {
+        queryZipCandidates.push(fullPath);
+      }
     }
   }
 
   const queryDir = latestByMtime(queryDirCandidates);
   const queryZip = latestByMtime(queryZipCandidates);
-  const resultTxt = queryDir ? findQueryCommandText(queryDir) : null;
+
+  // Look for result txt in a recent directory first, then fall back to stale
+  // directories whose individual files may have been updated (overwriting an
+  // existing file does not bump the parent directory mtime on macOS/Linux).
+  let resultTxt = queryDir ? findQueryCommandText(queryDir, startedAtMs) : null;
+  if (!resultTxt) {
+    for (const staleDir of staleDirCandidates) {
+      resultTxt = findQueryCommandText(staleDir, startedAtMs);
+      if (resultTxt) break;
+    }
+  }
+
   const generated = discoverGeneratedNearHeap(heapPath, startedAtMs);
   if (resultTxt && !generated.includes(resultTxt)) {
     generated.push(resultTxt);
@@ -124,7 +140,7 @@ export function resolveQueryArtifacts(heapPath: string, startedAtMs?: number): Q
   }
 
   return {
-    queryDir,
+    queryDir: queryDir ?? (resultTxt ? path.dirname(path.dirname(resultTxt)) : null),
     queryZip,
     resultTxt,
     generatedFiles: generated,

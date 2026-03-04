@@ -9,6 +9,93 @@ export const ALLOWED_REPORT_IDS = [
   "org.eclipse.mat.api:top_components",
   "org.eclipse.mat.api:compare",
   "org.eclipse.mat.api:suspects2",
+  "org.eclipse.mat.api:overview2",
+] as const;
+
+export const ALLOWED_COMMANDS = [
+  // Dominator tree analysis
+  "dominator_tree",
+  "show_dominator_tree",
+  "immediate_dominators",
+  "big_drops_in_dominator_tree",
+
+  // Path to GC roots
+  "path2gc",
+  "merge_shortest_paths",
+  "gc_roots",
+
+  // Histogram & object listing
+  "histogram",
+  "delta_histogram",
+  "list_objects",
+  "group_by_value",
+  "duplicate_classes",
+
+  // Leak detection
+  "leakhunter",
+  "leakhunter2",
+  "find_leaks",
+  "find_leaks2",
+  "reference_leak",
+
+  // Thread analysis
+  "thread_overview",
+  "thread_details",
+  "thread_stack",
+
+  // Collection analysis
+  "collection_fill_ratio",
+  "collections_grouped_by_size",
+  "array_fill_ratio",
+  "arrays_grouped_by_size",
+  "hash_entries",
+  "map_collision_ratio",
+  "extract_list_values",
+  "hash_set_values",
+  "primitive_arrays_with_a_constant_value",
+
+  // Reference analysis
+  "references_statistics",
+  "weak_references_statistics",
+  "soft_references_statistics",
+  "phantom_references_statistics",
+  "finalizer_references_statistics",
+
+  // Finalizer analysis
+  "finalizer_overview",
+  "finalizer_thread",
+  "finalizer_queue",
+  "finalizer_in_processing",
+  "finalizer_thread_locals",
+
+  // Retained set
+  "show_retained_set",
+  "customized_retained_set",
+
+  // Component & top consumers
+  "component_report",
+  "component_report_top",
+  "top_consumers",
+  "top_consumers_html",
+  "pie_biggest_objects",
+
+  // String & memory waste
+  "find_strings",
+  "waste_in_char_arrays",
+
+  // Heap info & misc
+  "heap_dump_overview",
+  "unreachable_objects",
+  "system_properties",
+  "class_references",
+  "comparison_report",
+
+  // Eclipse/OSGi specific
+  "bundle_registry",
+  "leaking_bundles",
+
+  // Export
+  "export_hprof",
 ] as const;
 
 const envSchema = z

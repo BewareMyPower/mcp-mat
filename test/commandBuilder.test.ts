@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildOqlCommand, buildParseReportCommand, formatOqlForMatCommand } from "../src/mat/commandBuilder.js";
+import { buildGenericCommand, buildOqlCommand, buildParseReportCommand, formatOqlForMatCommand } from "../src/mat/commandBuilder.js";
 
 const base = {
   javaPath: "java",
@@ -43,4 +43,44 @@ test("buildOqlCommand encodes command and output flags", () => {
 test("formatOqlForMatCommand escapes nested quotes", () => {
   const formatted = formatOqlForMatCommand('SELECT p FROM INSTANCEOF "com.example.MyClass" p');
   assert.equal(formatted, '"SELECT p FROM INSTANCEOF \\"com.example.MyClass\\" p"');
+});
+
+test("buildGenericCommand with command name only", () => {
+  const cmd = buildGenericCommand(base, {
+    commandName: "histogram",
+    format: "txt",
+    unzip: true,
+  });
+
+  assert.equal(cmd.command, "java");
+  assert.equal(cmd.args.at(-1), "org.eclipse.mat.api:query");
+  assert.ok(cmd.args.includes("-command=histogram"));
+  assert.ok(cmd.args.includes("-format=txt"));
+  assert.ok(cmd.args.includes("-unzip"));
+});
+
+test("buildGenericCommand with command args", () => {
+  const cmd = buildGenericCommand(base, {
+    commandName: "path2gc",
+    commandArgs: "0x12345678",
+    format: "html",
+    unzip: false,
+    limit: 50,
+  });
+
+  assert.equal(cmd.args.at(-1), "org.eclipse.mat.api:query");
+  assert.ok(cmd.args.includes("-command=path2gc 0x12345678"));
+  assert.ok(cmd.args.includes("-format=html"));
+  assert.ok(cmd.args.includes("-limit=50"));
+  assert.ok(!cmd.args.includes("-unzip"));
+});
+
+test("buildGenericCommand omits limit when not provided", () => {
+  const cmd = buildGenericCommand(base, {
+    commandName: "thread_overview",
+    format: "csv",
+    unzip: true,
+  });
+
+  assert.ok(!cmd.args.some((a) => a.startsWith("-limit=")));
 });

@@ -153,6 +153,93 @@ test("matIndexStatus returns index metadata", () => {
   }
 });
 
+test("matRunCommand returns query artifacts on success", async () => {
+  const { root, heap, config } = setupRuntime();
+  const queryDir = path.join(root, "heap_Query");
+  const pagesDir = path.join(queryDir, "pages");
+
+  let capturedCommandArg = "";
+  const service = new MatService(config, {
+    runCommand: async (command) => {
+      capturedCommandArg = command.args.find((arg) => arg.startsWith("-command=")) ?? "";
+      fs.mkdirSync(pagesDir, { recursive: true });
+      fs.writeFileSync(path.join(pagesDir, "Query_Command1.txt"), "result line 1\nresult line 2\n");
+      return successRunResult(command);
+    },
+  });
+
+  const result = await service.matRunCommand({
+    heap_path: heap,
+    command_name: "histogram",
+  });
+
+  assert.equal(result.status, "ok");
+  if (result.status === "ok") {
+    assert.equal(result.command_name, "histogram");
+    assert.equal(result.query_dir, queryDir);
+    assert.ok(result.result_txt?.includes("Query_Command1.txt"));
+    assert.ok(result.result_preview.length > 0);
+  }
+  assert.equal(capturedCommandArg, "-command=histogram");
+});
+
+test("matRunCommand passes command_args correctly", async () => {
+  const { heap, config } = setupRuntime();
+
+  let capturedCommandArg = "";
+  const service = new MatService(config, {
+    runCommand: async (command) => {
+      capturedCommandArg = command.args.find((arg) => arg.startsWith("-command=")) ?? "";
+      return successRunResult(command);
+    },
+  });
+
+  const result = await service.matRunCommand({
+    heap_path: heap,
+    command_name: "path2gc",
+    command_args: "0x12345678",
+  });
+
+  assert.equal(result.status, "ok");
+  assert.equal(capturedCommandArg, "-command=path2gc 0x12345678");
+});
+
+test("matRunCommand rejects unknown command names", async () => {
+  const { heap, config } = setupRuntime();
+  const service = new MatService(config, {
+    runCommand: async (command) => successRunResult(command),
+  });
+
+  const result = await service.matRunCommand({
+    heap_path: heap,
+    command_name: "not_a_real_command",
+  });
+
+  assert.equal(result.status, "error");
+  if (result.status === "error") {
+    assert.equal(result.category, "MAT_PARSE_FAILED");
+    assert.ok(result.message.includes("Unsupported command_name"));
+  }
+});
+
+test("matRunCommand returns error on non-zero exit", async () => {
+  const { heap, config } = setupRuntime();
+  const service = new MatService(config, {
+    runCommand: async (command) => ({
+      ...successRunResult(command),
+      exitCode: 1,
+      stderr: "Command execution error",
+    }),
+  });
+
+  const result = await service.matRunCommand({
+    heap_path: heap,
+    command_name: "histogram",
+  });
+
+  assert.equal(result.status, "error");
+});
+
 test("matOqlSpec returns oql parser guidance", () => {
   const { config } = setupRuntime();
   const service = new MatService(config, {

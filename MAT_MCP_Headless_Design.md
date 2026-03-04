@@ -154,6 +154,61 @@ Output:
 - `threads_file`
 - `last_modified`
 
+## 5.5 `mat_run_command`
+
+Purpose: Execute any of the 56 built-in MAT analysis commands headlessly and return result artifacts. This is the general-purpose command runner for MAT CLI commands that are not OQL queries or predefined reports.
+
+Input:
+- `heap_path` (required)
+- `command_name` (required, e.g. `histogram`, `dominator_tree`, `path2gc`, `thread_overview`)
+- optional `command_args` (format depends on command, e.g. an object address like `0x12345678` for `path2gc`, or a class pattern for `histogram`)
+- optional `format` (`txt` default, `html`, `csv`)
+- optional `unzip` (default `true`)
+- optional `limit`
+- optional `xmx_mb`
+- optional `timeout_sec`
+
+Output:
+- `status` (`ok` or `error`)
+- `exit_code`
+- `query_dir`
+- `query_zip`
+- `result_txt` (primary parsed file path for `txt`)
+- `result_preview` (first N lines)
+- `generated_files` (array)
+- `stdout_tail`
+- `stderr_tail`
+
+Supported commands (56 total):
+
+| Category | Commands |
+|---|---|
+| Dominator tree | `dominator_tree`, `show_dominator_tree`, `immediate_dominators`, `big_drops_in_dominator_tree` |
+| Path to GC roots | `path2gc`, `merge_shortest_paths`, `gc_roots` |
+| Histogram & objects | `histogram`, `delta_histogram`\*, `list_objects`, `group_by_value`, `duplicate_classes` |
+| Leak detection | `leakhunter`, `leakhunter2`\*, `find_leaks`, `find_leaks2`\*, `reference_leak` |
+| Thread analysis | `thread_overview`, `thread_details`, `thread_stack` |
+| Collection analysis | `collection_fill_ratio`, `collections_grouped_by_size`, `array_fill_ratio`, `arrays_grouped_by_size`, `hash_entries`, `map_collision_ratio`, `extract_list_values`, `hash_set_values`, `primitive_arrays_with_a_constant_value` |
+| Reference analysis | `references_statistics`, `weak_references_statistics`, `soft_references_statistics`, `phantom_references_statistics`, `finalizer_references_statistics` |
+| Finalizer analysis | `finalizer_overview`, `finalizer_thread`, `finalizer_queue`, `finalizer_in_processing`, `finalizer_thread_locals` |
+| Retained set | `show_retained_set`, `customized_retained_set` |
+| Component & top consumers | `component_report`, `component_report_top`, `top_consumers`, `top_consumers_html`, `pie_biggest_objects` |
+| String & memory waste | `find_strings`, `waste_in_char_arrays` |
+| Heap info & misc | `heap_dump_overview`, `unreachable_objects`, `system_properties`, `class_references`, `comparison_report`\* |
+| Eclipse/OSGi | `bundle_registry`, `leaking_bundles` |
+| Export | `export_hprof` |
+
+\* Requires a `baseline` heap dump (second `.hprof` file).
+
+## 5.6 `mat_oql_spec`
+
+Purpose: Return OQL parser-mode guidance, supported patterns, and known limitations. This is a static reference tool that does not execute any MAT process.
+
+Input: (none)
+
+Output:
+- `oql_spec` (structured object with OQL syntax guidance including supported SELECT/FROM/WHERE patterns, built-in functions, field access syntax, and known parser limitations)
+
 ## 6. Command Construction
 
 ## 6.1 Required environment variables
@@ -184,6 +239,12 @@ For OQL:
 
 ```bash
 "-command=oql \"${OQL}\"" -format=txt -unzip org.eclipse.mat.api:query
+```
+
+For generic commands (`mat_run_command`):
+
+```bash
+"-command=${COMMAND_NAME} ${COMMAND_ARGS}" -format=txt -unzip org.eclipse.mat.api:query
 ```
 
 Implementation requirement: pass arguments as an array to `subprocess` (no shell interpolation) to avoid quoting bugs and injection.
@@ -271,15 +332,16 @@ Expose a debug mode that saves full MAT console logs to a configured log directo
 
 ## 12. Rollout Plan
 
-1. Phase 1: Internal alpha
+1. Phase 1: Internal alpha (complete)
 - Implement `mat_healthcheck`, `mat_oql_query`.
 - Validate on macOS and Linux.
 
-2. Phase 2: Beta
+2. Phase 2: Beta (complete)
 - Add `mat_parse_report`, `mat_index_status`.
 - Add stronger logging and error mapping.
 
-3. Phase 3: Production
+3. Phase 3: Production (complete)
+- Add `mat_run_command` (56 built-in commands) and `mat_oql_spec`.
 - Harden allowlists and resource limits.
 - Document operational runbook and troubleshooting.
 

@@ -85,12 +85,26 @@ export interface MatOqlSpecSuccess {
   notes: string[];
 }
 
+export interface MatRunCommandSuccess {
+  status: "ok";
+  exit_code: number;
+  command_name: string;
+  query_dir: string | null;
+  query_zip: string | null;
+  result_txt: string | null;
+  result_preview: string[];
+  generated_files: string[];
+  stdout_tail: string;
+  stderr_tail: string;
+}
+
 export type ToolResponse =
   | MatHealthcheckSuccess
   | MatParseReportSuccess
   | MatOqlQuerySuccess
   | MatIndexStatusSuccess
   | MatOqlSpecSuccess
+  | MatRunCommandSuccess
   | MatErrorResponse;
 
 export class MatMcpError extends Error {

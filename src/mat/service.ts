@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { ALLOWED_REPORT_IDS, type ServerConfig } from "../config.js";
+import { ALLOWED_COMMANDS, ALLOWED_REPORT_IDS, type ServerConfig } from "../config.js";
 import {
   createRequestContext,
   logRequestEnd,
@@ -14,12 +14,13 @@ import {
   type MatOqlQuerySuccess,
   type MatOqlSpecSuccess,
   type MatParseReportSuccess,
+  type MatRunCommandSuccess,
   type MatErrorResponse,
   type RunCommand,
   type RunResult,
 } from "../types.js";
 import { resolveIndexArtifacts, resolveQueryArtifacts, resolveReportArtifacts } from "./artifacts.js";
-import { buildOqlCommand, buildParseReportCommand } from "./commandBuilder.js";
+import { buildGenericCommand, buildOqlCommand, buildParseReportCommand } from "./commandBuilder.js";
 import { classifyRunFailure, classifySpawnError } from "./errorClassifier.js";
 import { detectJavaVersion, resolveMatLauncher } from "./launcher.js";
 import { MAT_OQL_SPEC, normalizeOqlInput } from "./oqlSpec.js";
@@ -50,6 +51,17 @@ export interface HealthcheckInput {
 
 export interface IndexStatusInput {
   heap_path: string;
+}
+
+export interface RunCommandInput {
+  heap_path: string;
+  command_name: string;
+  command_args?: string;
+  format?: "txt" | "html" | "csv";
+  unzip?: boolean;
+  limit?: number;
+  xmx_mb?: number;
+  timeout_sec?: number;
 }
 
 export interface MatServiceDeps {
@@ -255,6 +267,92 @@ export class MatService {
     }
   }
 
+  async matRunCommand(input: RunCommandInput): Promise<MatRunCommandSuccess | MatErrorResponse> {
+    const context = createRequestContext("mat_run_command", input.heap_path, this.config.privacyMode);
+    logRequestStart(context);
+
+    try {
+      const commandName = this.validateCommandName(input.command_name);
+      const heapPath = ensureAllowedHeapPath(input.heap_path, this.config.allowedRoots);
+      ensureWriteAccessNearHeap(heapPath);
+      const launcher = this.resolveLauncher();
+
+      if (input.command_args !== undefined) {
+        const argsBytes = Buffer.byteLength(input.command_args, "utf8");
+        if (argsBytes > this.config.oqlMaxBytes) {
+          throw new MatMcpError({
+            category: "INVALID_QUERY",
+            message: `command_args exceeds max size (${argsBytes} > ${this.config.oqlMaxBytes} bytes).`,
+            hint: "Reduce command_args size or increase MAT_OQL_MAX_BYTES.",
+          });
+        }
+      }
+
+      const command = buildGenericCommand(
+        {
+          javaPath: this.config.javaPath,
+          launcherPath: launcher,
+          heapPath,
+          configDir: this.config.matConfigDir,
+          dataDir: this.config.matDataDir,
+          xmxMb: this.validateBoundedInt(input.xmx_mb, this.config.defaultXmxMb, 256, 262144, "xmx_mb"),
+          timeoutSec: this.validateBoundedInt(input.timeout_sec, this.config.defaultTimeoutSec, 5, 172800, "timeout_sec"),
+        },
+        {
+          commandName,
+          commandArgs: input.command_args,
+          format: input.format ?? "txt",
+          unzip: input.unzip ?? true,
+          limit: input.limit === undefined ? undefined : this.validateBoundedInt(input.limit, input.limit, 1, 10_000_000, "limit"),
+        },
+      );
+
+      const run = await this.executeMat(command);
+      persistDebugLog({
+        enabled: this.config.debug,
+        logDir: this.config.debugLogDir,
+        context,
+        run,
+      });
+
+      if (run.exitCode !== 0) {
+        throw classifyRunFailure(run, this.config.stdioTailChars);
+      }
+
+      const artifacts = resolveQueryArtifacts(heapPath, context.startedAtMs);
+      const resultPreview = artifacts.resultTxt ? readResultPreview(artifacts.resultTxt, this.config.resultPreviewLines) : [];
+      const response: MatRunCommandSuccess = {
+        status: "ok",
+        exit_code: run.exitCode ?? 0,
+        command_name: commandName,
+        query_dir: artifacts.queryDir,
+        query_zip: artifacts.queryZip,
+        result_txt: artifacts.resultTxt,
+        result_preview: resultPreview,
+        generated_files: artifacts.generatedFiles,
+        stdout_tail: tail(run.stdout, this.config.stdioTailChars),
+        stderr_tail: tail(run.stderr, this.config.stdioTailChars),
+      };
+
+      logRequestEnd(context, {
+        status: "ok",
+        elapsedMs: Date.now() - context.startedAtMs,
+        exitCode: run.exitCode,
+        artifacts: artifacts.generatedFiles,
+      });
+      return response;
+    } catch (error) {
+      const response = this.normalizeError(error, "MAT_PARSE_FAILED");
+      logRequestEnd(context, {
+        status: "error",
+        category: response.category,
+        elapsedMs: Date.now() - context.startedAtMs,
+        exitCode: response.exit_code,
+      });
+      return response;
+    }
+  }
+
   matOqlSpec(): MatOqlSpecSuccess {
     const context = createRequestContext("mat_oql_spec", undefined, this.config.privacyMode);
     logRequestStart(context);
@@ -318,6 +416,18 @@ export class MatService {
       category: "MAT_PARSE_FAILED",
       message: `Unsupported report_id: ${reportId}`,
       hint: `Use one of: ${ALLOWED_REPORT_IDS.join(", ")}`,
+    });
+  }
+
+  private validateCommandName(commandName: string): string {
+    const trimmed = commandName.trim();
+    if ((ALLOWED_COMMANDS as readonly string[]).includes(trimmed)) {
+      return trimmed;
+    }
+    throw new MatMcpError({
+      category: "MAT_PARSE_FAILED",
+      message: `Unsupported command_name: ${trimmed}`,
+      hint: `Use one of: ${(ALLOWED_COMMANDS as readonly string[]).join(", ")}`,
     });
   }
 
