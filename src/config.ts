@@ -74,9 +74,6 @@ function parseBool(value: string | undefined, fallback: boolean): boolean {
 
 function normalizeDirectory(inputPath: string, envName: string): string {
   const absolute = path.resolve(inputPath);
-  if (!path.isAbsolute(absolute)) {
-    throw new Error(`${envName} must resolve to an absolute path.`);
-  }
   if (!fs.existsSync(absolute)) {
     throw new Error(`${envName} does not exist: ${absolute}`);
   }

@@ -11,7 +11,6 @@ const WRITE_PERMISSION_PATTERNS = [
 ];
 
 const INVALID_QUERY_PATTERNS = [
-  /oql/i,
   /syntax/i,
   /parse error/i,
   /unexpected token/i,
@@ -26,7 +25,7 @@ function includesPattern(text: string, patterns: RegExp[]): boolean {
 export function classifyRunFailure(run: RunResult, tailChars: number): MatMcpError {
   const stdoutTail = tail(run.stdout, tailChars);
   const stderrTail = tail(run.stderr, tailChars);
-  const merged = `${run.stdout}\n${run.stderr}`;
+  const merged = `${stdoutTail}\n${stderrTail}`;
 
   if (run.timedOut) {
     return new MatMcpError({

@@ -36,12 +36,19 @@ function safeReadDir(directory: string): fs.Dirent[] {
 }
 
 function latestByMtime(paths: string[]): string | null {
-  const sorted = [...paths].sort((a, b) => {
-    const aMtime = fs.statSync(a).mtimeMs;
-    const bMtime = fs.statSync(b).mtimeMs;
-    return bMtime - aMtime;
-  });
-  return sorted[0] ?? null;
+  if (paths.length === 0) return null;
+  return paths
+    .map((p) => ({ p, mtime: fs.statSync(p).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)[0].p;
+}
+
+function isRecentEnough(fullPath: string, startedAtMs: number | undefined): boolean {
+  if (startedAtMs === undefined) return true;
+  try {
+    return fs.statSync(fullPath).mtimeMs >= startedAtMs - 2000;
+  } catch {
+    return false;
+  }
 }
 
 function discoverGeneratedNearHeap(heapPath: string, startedAtMs?: number): string[] {
@@ -61,16 +68,7 @@ function discoverGeneratedNearHeap(heapPath: string, startedAtMs?: number): stri
       }
 
       const fullPath = path.join(parent, entry.name);
-      if (startedAtMs !== undefined) {
-        try {
-          if (fs.statSync(fullPath).mtimeMs < startedAtMs - 2000) {
-            return false;
-          }
-        } catch {
-          return false;
-        }
-      }
-      return true;
+      return isRecentEnough(fullPath, startedAtMs);
     })
     .map((entry) => path.join(parent, entry.name))
     .sort();
@@ -104,14 +102,8 @@ export function resolveQueryArtifacts(heapPath: string, startedAtMs?: number): Q
       continue;
     }
 
-    if (startedAtMs !== undefined) {
-      try {
-        if (fs.statSync(fullPath).mtimeMs < startedAtMs - 2000) {
-          continue;
-        }
-      } catch {
-        continue;
-      }
+    if (!isRecentEnough(fullPath, startedAtMs)) {
+      continue;
     }
 
     if (entry.isDirectory()) {

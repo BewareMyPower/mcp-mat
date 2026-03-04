@@ -9,15 +9,11 @@ function isWithinRoot(candidate: string, root: string): boolean {
 
 export function ensureAllowedHeapPath(heapPath: string, allowedRoots: string[]): string {
   const absoluteInput = path.resolve(heapPath);
-  if (!path.isAbsolute(absoluteInput)) {
-    throw new MatMcpError({
-      category: "HEAP_NOT_FOUND",
-      message: `Heap path must be absolute: ${heapPath}`,
-      hint: "Provide an absolute heap dump path inside MAT_ALLOWED_ROOTS.",
-    });
-  }
 
-  if (!fs.existsSync(absoluteInput)) {
+  let canonical: string;
+  try {
+    canonical = fs.realpathSync(absoluteInput);
+  } catch {
     throw new MatMcpError({
       category: "HEAP_NOT_FOUND",
       message: `Heap path does not exist: ${absoluteInput}`,
@@ -25,7 +21,6 @@ export function ensureAllowedHeapPath(heapPath: string, allowedRoots: string[]):
     });
   }
 
-  const canonical = fs.realpathSync(absoluteInput);
   const stat = fs.statSync(canonical);
   if (!stat.isFile()) {
     throw new MatMcpError({

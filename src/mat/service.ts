@@ -384,13 +384,37 @@ export class MatService {
 }
 
 function readResultPreview(filePath: string, lineLimit: number): string[] {
-  if (!fs.existsSync(filePath)) {
+  let fd: number;
+  try {
+    fd = fs.openSync(filePath, "r");
+  } catch {
     return [];
   }
 
-  const content = fs.readFileSync(filePath, "utf8");
-  return content
-    .split(/\r?\n/)
-    .slice(0, lineLimit)
-    .filter((line) => line.length > 0);
+  try {
+    const lines: string[] = [];
+    const buf = Buffer.alloc(8192);
+    let remainder = "";
+    let bytesRead: number;
+
+    while ((bytesRead = fs.readSync(fd, buf)) > 0) {
+      const chunk = remainder + buf.toString("utf8", 0, bytesRead);
+      const parts = chunk.split(/\r?\n/);
+      remainder = parts.pop() ?? "";
+
+      for (const part of parts) {
+        if (part.length > 0) {
+          lines.push(part);
+          if (lines.length >= lineLimit) return lines;
+        }
+      }
+    }
+
+    if (remainder.length > 0 && lines.length < lineLimit) {
+      lines.push(remainder);
+    }
+    return lines;
+  } finally {
+    fs.closeSync(fd);
+  }
 }

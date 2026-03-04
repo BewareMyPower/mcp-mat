@@ -11,14 +11,15 @@ export interface LauncherOptions {
 export function resolveMatLauncher(options: LauncherOptions): string {
   if (options.matLauncher) {
     const absolute = path.resolve(options.matLauncher);
-    if (!fs.existsSync(absolute)) {
+    try {
+      return fs.realpathSync(absolute);
+    } catch {
       throw new MatMcpError({
         category: "MAT_NOT_FOUND",
         message: `MAT launcher not found: ${absolute}`,
         hint: "Set MAT_LAUNCHER to a valid org.eclipse.equinox.launcher_*.jar path.",
       });
     }
-    return fs.realpathSync(absolute);
   }
 
   if (!options.matHome) {
